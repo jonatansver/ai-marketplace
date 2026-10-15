@@ -26,6 +26,11 @@ All notable changes to the `commentable-html` plugin are documented here. The fo
   Compact purpose controls and visual-viewport height caps keep discussion Save reachable when
   the keyboard opens.
 
+### Fixed
+
+- The AI-discussion showcase wraps long card headings so wider fallback fonts cannot expand
+  the printed slide's grid or clip its content.
+
 ## [1.853.1] - 2026-10-05
 
 ### Changed
