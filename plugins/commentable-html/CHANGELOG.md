@@ -25,11 +25,27 @@ All notable changes to the `commentable-html` plugin are documented here. The fo
   exact pending retries as no-ops. Owner replies update embedded review state atomically.
   Compact purpose controls and visual-viewport height caps keep discussion Save reachable when
   the keyboard opens.
+- Restored approximately 5% headroom in the shareable-template size budget after retaining
+  main's Mermaid flowchart recovery alongside AI discussions.
+- Only the latest human edit command remains pending while independent unanswered questions stay
+  actionable. Markdown exports distinguish pending and historical discussion messages and label
+  AI responses as context rather than requests.
 
 ### Fixed
 
 - The AI-discussion showcase wraps long card headings so wider fallback fonts cannot expand
   the printed slide's grid or clip its content.
+- Discussion imports reject duplicate incoming ids and ids colliding with unrelated comments or
+  threads before writing document state.
+
+## [1.853.2] - 2026-10-23
+
+### Fixed
+
+- Recover flowcharts whose normal-sized nodes are stranded far from their edge endpoints, making
+  the diagram appear tiny across an oversized canvas. The existing SVG-text rerender now detects
+  this malformed geometry on load, reveal, and layout changes, including offline exports, without
+  compacting intentionally sparse connected diagrams.
 
 ## [1.853.1] - 2026-10-05
 

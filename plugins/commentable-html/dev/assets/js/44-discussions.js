@@ -56,6 +56,9 @@ function cmhStampDiscussion(c, purpose) {
 function cmhPendingDiscussion(root, arr) {
   if (!root || root.threadType !== "discussion") return [];
   const messages = [root].concat(repliesOf(root.id, arr || comments));
+  const latestCommand = messages.slice().reverse().find(function (m) {
+    return m.role !== "assistant" && cmhDiscussionIntent(m) === "command";
+  });
   const done = new Set();
   messages.forEach(function (m) {
     if (m.role !== "assistant" || (m.intent !== "answer" && m.intent !== "applied")) return;
@@ -66,11 +69,21 @@ function cmhPendingDiscussion(root, arr) {
     });
   });
   return messages.filter(function (m) {
-    return m.role !== "assistant"
-      && !done.has(m.id + "@" + m.requestVersion + ":" + cmhDiscussionIntent(m));
+    if (m.role === "assistant") return false;
+    const intent = cmhDiscussionIntent(m);
+    if (intent === "command" && latestCommand && latestCommand.id !== m.id) return false;
+    return !done.has(m.id + "@" + m.requestVersion + ":" + intent);
   }).map(function (m) {
     return { threadId: root.id, id: m.id, intent: cmhDiscussionIntent(m), version: m.requestVersion };
   });
+}
+function cmhLatestHumanDiscussionIntent(root, arr) {
+  if (!root || root.threadType !== "discussion") return "question";
+  const messages = [root].concat(repliesOf(root.id, arr || comments));
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].role !== "assistant") return cmhDiscussionIntent(messages[i]);
+  }
+  return "question";
 }
 function cmhDiscussionDocumentMetadata(roots) {
   const selected = new Set(roots.map(function (c) { return c.id; }));
@@ -91,12 +104,15 @@ function cmhDiscussionDocumentMetadata(roots) {
 function cmhDiscussionStatusHtml(c) {
   if (c.threadType !== "discussion") return "";
   const pending = cmhPendingDiscussion(c);
-  const text = pending.some(function (r) { return r.intent === "command"; }) ? "Edit requested"
-    : pending.length ? "Awaiting answer" : "Answered";
+  const status = pending.some(function (r) { return r.intent === "command"; })
+    ? { label: "Edit requested", icon: "&#x270f;&#xfe0f;" }
+    : pending.length ? { label: "Awaiting answer", icon: "&#x23f3;" }
+      : { label: "Answered", icon: "&#x2705;" };
   const handoff = pending.some(function (r) { return r.intent === "question"; })
-    ? '<div class="cm-discussion-handoff" title="Paste Copy all to the AI or send an exported HTML with the discussion embedded. Copy and export are not an AI read receipt; a matching answer clears this indicator.">Needs owner handoff / AI reply</div>'
+    ? '<div class="cm-discussion-handoff" title="Paste Copy all to the AI or send an exported HTML with the discussion embedded. Copy and export are not an AI read receipt; a matching answer clears this indicator."><span class="cm-discussion-handoff-icon" aria-hidden="true">&#x1f4e4;</span> <span class="cm-discussion-handoff-label">Needs owner handoff / AI reply</span></div>'
     : "";
-  return '<div class="cm-discussion-status">' + text + '</div>' + handoff;
+  return '<div class="cm-discussion-status"><span class="cm-discussion-status-icon" aria-hidden="true">'
+    + status.icon + '</span> <span class="cm-discussion-status-label">' + status.label + '</span></div>' + handoff;
 }
 function cmhMessageKind(c, root) {
   if (!root || root.threadType !== "discussion") return "";
@@ -115,11 +131,11 @@ function cmhPurposeControl(label, value, reply) {
   const select = document.createElement("select");
   select.setAttribute("aria-label", label);
   if (reply) {
-    select.add(new Option("Question / clarification (no document edit)", "question"));
-    select.add(new Option("Command: edit the document using this discussion", "command"));
+    select.add(new Option("Ask AI", "question"));
+    select.add(new Option("Request edit", "command"));
   } else {
-    select.add(new Option("Edit request (existing comment workflow)", "edit"));
-    select.add(new Option("Discussion: ask AI (do not edit the document)", "discussion"));
+    select.add(new Option("Request edit", "edit"));
+    select.add(new Option("Ask AI", "discussion"));
   }
   select.value = value;
   wrap.append(caption, select);
@@ -129,7 +145,7 @@ function cmhConfigureComposerPurpose(el, mode, c) {
   const root = cmhDiscussionRoot(c);
   let control;
   if (mode === "new-reply" && root) {
-    control = cmhPurposeControl("Reply purpose", "question", true);
+    control = cmhPurposeControl("Reply purpose", cmhLatestHumanDiscussionIntent(root), true);
   } else if (mode === "edit" && c && c.parentId && root && c.role !== "assistant") {
     control = cmhPurposeControl("Reply purpose", cmhDiscussionIntent(c), true);
   } else if (String(mode || "").indexOf("new") === 0 && mode !== "new-reply") {

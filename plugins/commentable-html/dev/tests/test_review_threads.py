@@ -132,6 +132,28 @@ class DiscussionTests(ReviewCase):
         self.assertEqual(review_threads.pending_threads(self.embedded()), [])
         self.assertEqual(len(self.embedded()), 4)
 
+    def test_only_latest_command_remains_pending_after_it_is_applied(self):
+        latest = {
+            **COMMAND, "id": "ca000001", "note": "Actually, document four attempts.",
+            "requestVersion": "r" + "3" * 32,
+        }
+        self.seed([QUESTION, COMMAND, latest])
+        pending = review_threads.pending_threads(self.embedded())[0]["requests"]
+        self.assertEqual(pending, [
+            {**request(QUESTION), "intent": "question"},
+            {**request(latest), "intent": "command"},
+        ])
+
+        review_threads.reply_document(self.doc, QUESTION["id"], "The policy now uses four attempts.",
+                                     [request(latest)], kind="applied")
+        pending = review_threads.pending_threads(self.embedded())[0]["requests"]
+        self.assertEqual(pending, [{**request(QUESTION), "intent": "question"}])
+        before = self.doc.read_bytes()
+        with self.assertRaisesRegex(ValueError, "pending|acknowledged"):
+            review_threads.reply_document(self.doc, QUESTION["id"], "The older policy was applied.",
+                                         [request(COMMAND)], kind="applied")
+        self.assertEqual(self.doc.read_bytes(), before)
+
     def test_stale_response_and_answering_a_command_are_refused_without_a_write(self):
         self.seed([QUESTION, COMMAND])
         before = self.doc.read_bytes()
@@ -204,6 +226,65 @@ class DiscussionTests(ReviewCase):
         review_threads.reply_document(self.doc, q["id"], "Answer.", [request(q)])
         before = self.doc.read_bytes()
         with self.assertRaisesRegex(ValueError, "snapshot|stale|acknowledged|changed"):
+            review_threads.import_bundle(self.doc, bundle)
+        self.assertEqual(self.doc.read_bytes(), before)
+
+    def test_import_rejects_ids_owned_by_unrelated_comments_without_writing(self):
+        legacy = {
+            "id": "clegacy01", "anchorType": "document", "quote": "(document-wide)",
+            "note": "Preserve this ordinary edit comment.", "author": "Cara",
+            "createdAt": "2026-10-08T12:01:00.000Z",
+        }
+        self.seed([QUESTION, legacy])
+        incoming = {
+            **QUESTION, "id": legacy["id"], "note": "Replace the legacy comment.",
+            "createdAt": "2026-10-08T12:10:00.000Z",
+        }
+        bundle = self.bundle([incoming])
+        metadata_line = next(line for line in bundle.splitlines()
+                             if line.startswith("DISCUSSION_DOCUMENT_JSON: "))
+        metadata = json.loads(metadata_line.partition(": ")[2])
+        metadata["baseSnapshot"] = []
+        bundle = bundle.replace(metadata_line,
+                                "DISCUSSION_DOCUMENT_JSON: " + json.dumps(metadata))
+        before = self.doc.read_bytes()
+        with self.assertRaisesRegex(ValueError, "collid|unrelated|owned"):
+            review_threads.import_bundle(self.doc, bundle)
+        self.assertEqual(self.doc.read_bytes(), before)
+
+    def test_import_rejects_cross_thread_id_reuse_without_writing(self):
+        other = {**QUESTION, "id": "cotherthread", "note": "Another discussion."}
+        foreign_reply = {
+            **COMMAND, "id": "cforeignreply", "parentId": other["id"],
+            "createdAt": "2026-10-08T12:04:00.000Z",
+        }
+        incoming_reply = {
+            **COMMAND, "id": foreign_reply["id"], "parentId": QUESTION["id"],
+            "note": "Overwrite the other thread's reply.",
+            "createdAt": "2026-10-08T12:10:00.000Z",
+        }
+        self.seed([QUESTION, other, foreign_reply])
+        bundle = self.bundle([QUESTION, incoming_reply])
+        before = self.doc.read_bytes()
+        with self.assertRaisesRegex(ValueError, "collid|unrelated|thread|owned"):
+            review_threads.import_bundle(self.doc, bundle)
+        self.assertEqual(self.doc.read_bytes(), before)
+
+    def test_import_rejects_duplicate_incoming_ids_without_writing(self):
+        root = {**QUESTION, "id": "cduplicate01"}
+        first = {
+            **COMMAND, "id": "cduplicate02", "parentId": root["id"],
+            "requestVersion": "r" + "3" * 32,
+        }
+        duplicate = {
+            **first, "note": "A second incoming message reuses the id.",
+            "requestVersion": "r" + "4" * 32,
+            "createdAt": "2026-10-08T12:10:00.000Z",
+        }
+        requests = [{**request(root), "threadId": root["id"], "intent": "question"}]
+        bundle = self.bundle([root, first, duplicate], requests)
+        before = self.doc.read_bytes()
+        with self.assertRaisesRegex(ValueError, "duplicate.*id|id.*duplicate"):
             review_threads.import_bundle(self.doc, bundle)
         self.assertEqual(self.doc.read_bytes(), before)
 

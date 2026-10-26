@@ -3,6 +3,16 @@
 // (each root plus its replies) are emitted, and the tracked non-comment changes are left out
 // entirely, because a selection is a comment-only scope. With no selection this is the unchanged
 // all-or-nothing bundle.
+function _copyAllEligibleComments(live) {
+  const roots = (typeof threadRoots === "function") ? threadRoots(live) : live;
+  const answered = new Set();
+  roots.forEach(function (root) {
+    if (root.threadType === "discussion" && !cmhPendingDiscussion(root, live).length) {
+      answered.add(root.id);
+    }
+  });
+  return live.filter(function (c) { return !answered.has(c.id) && !answered.has(c.parentId); });
+}
 function buildCopyText(pickedIds, partialScope) {
   // A fresh formatting pass: drop the render-pass zone-formatter memo so a host timezone change
   // since the last render cannot label the bundle with the old zone name (CMH-SIDE-13).
@@ -11,7 +21,7 @@ function buildCopyText(pickedIds, partialScope) {
   const allLive = withoutHandled(comments);
   const liveComments = picked
     ? allLive.filter(function (c) { return picked.has(c.id) || (c.parentId && picked.has(c.parentId)); })
-    : allLive;
+    : _copyAllEligibleComments(allLive);
   const stateChanges = picked ? [] : ((typeof widgetStateChanges === "function") ? widgetStateChanges() : []);
   const clChanges = picked ? [] : ((typeof checklistChanges === "function") ? checklistChanges() : []);
   const noteChanges = picked ? [] : ((typeof notesChanges === "function") ? notesChanges() : []);
@@ -396,9 +406,10 @@ function _copyAllState() {
   // A selection is a comment-only scope, so it alone decides whether there is anything to copy;
   // the tracked note/checklist/layout changes are not part of a partial hand-back.
   const picked = (typeof selectedCommentIds === "function") ? selectedCommentIds() : [];
+  const copyAllLive = picked.length ? live : _copyAllEligibleComments(live);
   return {
-    live, changes, clCh, noteCh, picked,
-    hasContent: picked.length ? true : !!(live.length || changes.length || clCh.length || noteCh.length),
+    live, copyAllLive, changes, clCh, noteCh, picked,
+    hasContent: picked.length ? true : !!(copyAllLive.length || changes.length || clCh.length || noteCh.length),
   };
 }
 function _setCopyAllTip(btn, text) {
@@ -448,7 +459,7 @@ async function copyAll() {
   const picked = state.picked;
   const live = picked.length
     ? state.live.filter(function (c) { return picked.indexOf(c.id) >= 0 || (c.parentId && picked.indexOf(c.parentId) >= 0); })
-    : state.live;
+    : state.copyAllLive;
   const changes = picked.length ? [] : state.changes;
   const roots = (typeof threadRoots === "function") ? threadRoots(live) : live;
   const n = roots.length;

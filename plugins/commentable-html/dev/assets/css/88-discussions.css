@@ -5,9 +5,9 @@
 }
 .cm-purpose-control > span { flex: none; }
 .cm-purpose-control select {
-  flex: 1; min-width: 0; min-height: 32px; padding: 5px;
-  color: var(--cp-text); background: var(--cp-bg); border: 1px solid var(--cp-border);
-  border-radius: 5px; font: inherit;
+  flex: 1; min-width: 0; min-height: 32px; padding: 0.35rem 0.5rem;
+  color: var(--cp-text); background: var(--cp-surface); border: 1px solid var(--cp-border);
+  border-radius: 6px; font: inherit;
 }
 .cm-message-kind {
   display: inline-block; margin-right: 6px; color: var(--cp-text-muted);

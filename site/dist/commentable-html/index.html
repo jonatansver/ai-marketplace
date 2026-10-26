@@ -499,12 +499,24 @@
             <div class="group-label">Changed</div>
             <ul>
               <li>Copy discussion imports are snapshot-bound, reject stale/deleted/answered requests, and keep exact pending retries as no-ops. Owner replies update embedded review state atomically. Compact purpose controls and visual-viewport height caps keep discussion Save reachable when the keyboard opens.</li>
+              <li>Restored approximately 5% headroom in the shareable-template size budget after retaining main&#x27;s Mermaid flowchart recovery alongside AI discussions.</li>
+              <li>Only the latest human edit command remains pending while independent unanswered questions stay actionable. Markdown exports distinguish pending and historical discussion messages and label AI responses as context rather than requests.</li>
             </ul>
             <div class="group-label">Fixed</div>
             <ul>
               <li>The AI-discussion showcase wraps long card headings so wider fallback fonts cannot expand the printed slide&#x27;s grid or clip its content.</li>
+              <li>Discussion imports reject duplicate incoming ids and ids colliding with unrelated comments or threads before writing document state.</li>
             </ul>
           </div>
+          <div class="release">
+            <div class="rel-head"><h3>[1.853.2] - 2026-10-23</h3></div>
+            <div class="group-label">Fixed</div>
+            <ul>
+              <li>Recover flowcharts whose normal-sized nodes are stranded far from their edge endpoints, making the diagram appear tiny across an oversized canvas. The existing SVG-text rerender now detects this malformed geometry on load, reveal, and layout changes, including offline exports, without compacting intentionally sparse connected diagrams.</li>
+            </ul>
+          </div>
+          <details class="older-releases">
+            <summary>Show 5 older releases</summary>
           <div class="release">
             <div class="rel-head"><h3>[1.853.1] - 2026-10-05</h3></div>
             <div class="group-label">Changed</div>
@@ -512,8 +524,6 @@
               <li>Moved each comment card&#x27;s Copy button immediately after edit in the action row, with the same bordered styling and mobile touch target. Select stays in the metadata row.</li>
             </ul>
           </div>
-          <details class="older-releases">
-            <summary>Show 5 older releases</summary>
           <div class="release">
             <div class="rel-head"><h3>[1.853.0] - 2026-09-27</h3></div>
             <div class="group-label">Changed</div>
@@ -542,14 +552,7 @@
               <li>Mermaid flowcharts no longer collapse into tiny, unreadable nodes when document-level HTML-label styles inflate both the drawing and its viewBox. The post-render audit now detects diagrams compressed below a legible layout scale and uses the existing bounded SVG-text repair without mistaking browser zoom or an ancestor transform for broken Mermaid geometry.</li>
             </ul>
           </div>
-          <div class="release">
-            <div class="rel-head"><h3>[1.850.1] - 2026-09-06</h3></div>
-            <div class="group-label">Changed</div>
-            <ul>
-              <li>Removed the legacy companion-file mode from the website, tutorial, in-document Help, public plugin guidance, and showcase deck. Existing companion-mode documents remain supported by the runtime, validator, migration tool, and technical compatibility references.</li>
-            </ul>
-          </div>
-            <p class="changelog-more">417 earlier releases in the <a href="https://github.com/urikanonov/ai-marketplace/blob/main/plugins/commentable-html/CHANGELOG.md">full changelog on GitHub</a>.</p>
+            <p class="changelog-more">418 earlier releases in the <a href="https://github.com/urikanonov/ai-marketplace/blob/main/plugins/commentable-html/CHANGELOG.md">full changelog on GitHub</a>.</p>
           </details>
           <!-- END:changelog -->
         </div>

@@ -290,7 +290,9 @@ def pending_threads(comments, questions_only=False):
         if root.get("parentId") or root.get("threadType") != "discussion":
             continue
         messages = [root] + sorted([c for c in comments if c.get("parentId") == root["id"]],
-                                   key=lambda c: (c["createdAt"], c["id"]))
+                                   key=lambda c: c["createdAt"])
+        latest_command = next((m for m in reversed(messages)
+                               if m.get("role") != "assistant" and m.get("intent") == "command"), None)
         done = set()
         for m in messages:
             if m.get("role") == "assistant" and m.get("intent") in ("answer", "applied"):
@@ -302,6 +304,8 @@ def pending_threads(comments, questions_only=False):
             if m.get("role") == "assistant":
                 continue
             intent = "command" if m.get("intent") == "command" else "question"
+            if intent == "command" and latest_command and m["id"] != latest_command["id"]:
+                continue
             ref = _request({"id": m["id"], "version": m.get("requestVersion")})
             if (ref["id"], ref["version"], intent) not in done and not (questions_only and intent == "command"):
                 requests.append({**ref, "intent": intent})
@@ -398,12 +402,33 @@ def import_bundle(path, bundle):
         raise ValueError("invalid discussion base revision")
     base = _validate_base_snapshot(metadata["baseSnapshot"])
     incoming = _comments(fields["DISCUSSION_COMMENTS_JSON"])
+    incoming_ids = set()
+    for comment in incoming:
+        if comment["id"] in incoming_ids:
+            raise ValueError("discussion bundle contains duplicate comment ids")
+        incoming_ids.add(comment["id"])
     roots = {c["id"] for c in incoming if c.get("threadType") == "discussion" and not c.get("parentId")}
     if any(c["id"] not in roots and c.get("parentId") not in roots for c in incoming):
         raise ValueError("a discussion bundle may contain only complete discussion threads")
     selected = _discussion_subset(current, roots)
-    identical = selected == sorted(incoming, key=lambda c: c["id"])
     known_ids = {c["id"] for c in selected}
+    current_by_id = {}
+    for comment in current:
+        current_by_id.setdefault(comment["id"], []).append(comment)
+    for comment in incoming:
+        existing = current_by_id.get(comment["id"], [])
+        if not existing:
+            continue
+        if len(existing) != 1:
+            raise ValueError("discussion comment id collides with ambiguous existing content")
+        previous = existing[0]
+        previous_root = previous.get("parentId") or previous["id"]
+        incoming_root = comment.get("parentId") or comment["id"]
+        if (comment["id"] not in known_ids or previous_root != incoming_root
+                or previous.get("parentId") != comment.get("parentId")
+                or (not previous.get("parentId") and previous.get("threadType") != "discussion")):
+            raise ValueError("discussion comment id collides with unrelated existing content or thread")
+    identical = selected == sorted(incoming, key=lambda c: c["id"])
     revision_changed = revision != _state_info(html)[3]
     if not identical and (base != _base_snapshot(current, roots)
                           or (revision_changed and any(c["id"] not in known_ids for c in incoming))):

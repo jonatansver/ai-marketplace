@@ -1023,8 +1023,9 @@ function openInlineReply(card, rootId) {
       _afterInlineSaveQuota(ok, "reply");
     },
     function () { _closeActiveInlineEditor(); });
-  if (cmhDiscussionRoot(comments.find(function (c) { return c.id === rootId; }))) {
-    editor.prepend(cmhPurposeControl("Reply purpose", "question", true));
+  const rootComment = comments.find(function (c) { return c.id === rootId; });
+  if (cmhDiscussionRoot(rootComment)) {
+    editor.prepend(cmhPurposeControl("Reply purpose", cmhLatestHumanDiscussionIntent(rootComment), true));
   }
   if (acts) acts.hidden = true;
   else if (btn) btn.hidden = true;
